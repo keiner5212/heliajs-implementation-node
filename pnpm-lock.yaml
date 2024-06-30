@@ -35,6 +35,9 @@ importers:
       '@libp2p/kad-dht':
         specifier: ^12.1.0
         version: 12.1.0
+      '@libp2p/peer-id':
+        specifier: ^4.1.4
+        version: 4.1.4
       '@libp2p/upnp-nat':
         specifier: ^1.2.0
         version: 1.2.0

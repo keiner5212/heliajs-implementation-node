@@ -20,6 +20,7 @@
     "@libp2p/dcutr": "^1.1.0",
     "@libp2p/identify": "^2.1.0",
     "@libp2p/kad-dht": "^12.1.0",
+    "@libp2p/peer-id": "^4.1.4",
     "@libp2p/upnp-nat": "^1.2.0",
     "@libp2p/webrtc": "^4.1.0",
     "@libp2p/websockets": "^8.1.0",
