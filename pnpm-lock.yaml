@@ -8,33 +8,12 @@ importers:
 
   .:
     dependencies:
-      '@chainsafe/libp2p-noise':
-        specifier: ^15.1.0
-        version: 15.1.0
-      '@chainsafe/libp2p-yamux':
-        specifier: ^6.0.2
-        version: 6.0.2
       '@helia/unixfs':
         specifier: ^3.0.6
         version: 3.0.6
-      '@libp2p/autonat':
-        specifier: ^1.1.0
-        version: 1.1.0
-      '@libp2p/bootstrap':
-        specifier: ^10.1.0
-        version: 10.1.0
       '@libp2p/circuit-relay-v2':
         specifier: ^1.1.0
         version: 1.1.0
-      '@libp2p/dcutr':
-        specifier: ^1.1.0
-        version: 1.1.0
-      '@libp2p/identify':
-        specifier: ^2.1.0
-        version: 2.1.0
-      '@libp2p/kad-dht':
-        specifier: ^12.1.0
-        version: 12.1.0
       '@libp2p/peer-id':
         specifier: ^4.1.4
         version: 4.1.4
@@ -44,9 +23,6 @@ importers:
       '@libp2p/webrtc':
         specifier: ^4.1.0
         version: 4.1.0(react-native@0.74.2(@babel/core@7.24.7)(@babel/preset-env@7.24.7(@babel/core@7.24.7))(react@18.2.0))
-      '@libp2p/websockets':
-        specifier: ^8.1.0
-        version: 8.1.0
       blockstore-fs:
         specifier: ^1.1.10
         version: 1.1.10
@@ -62,9 +38,6 @@ importers:
       helia:
         specifier: ^4.2.4
         version: 4.2.4(react-native@0.74.2(@babel/core@7.24.7)(@babel/preset-env@7.24.7(@babel/core@7.24.7))(react@18.2.0))
-      libp2p:
-        specifier: ^1.7.0
-        version: 1.7.0
       morgan:
         specifier: ^1.10.0
         version: 1.10.0

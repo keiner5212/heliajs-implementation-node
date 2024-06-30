@@ -3,15 +3,15 @@ import { FsBlockstore } from "blockstore-fs";
 import { FsDatastore } from "datastore-fs";
 import { createHelia } from "helia";
 import { unixfs } from "@helia/unixfs";
-import { noise } from "@chainsafe/libp2p-noise";
-import { yamux } from "@chainsafe/libp2p-yamux";
-import { bootstrap } from "@libp2p/bootstrap";
-import { identify, identifyPush } from "@libp2p/identify";
-import { autoNAT } from "@libp2p/autonat";
-import { dcutr } from "@libp2p/dcutr";
-import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
-import { createLibp2p } from "libp2p";
-import { webSockets } from "@libp2p/websockets";
+// import { noise } from "@chainsafe/libp2p-noise";
+// import { yamux } from "@chainsafe/libp2p-yamux";
+// import { bootstrap } from "@libp2p/bootstrap";
+// import { identify, identifyPush } from "@libp2p/identify";
+// import { autoNAT } from "@libp2p/autonat";
+// import { dcutr } from "@libp2p/dcutr";
+// import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
+// import { createLibp2p } from "libp2p";
+// import { webSockets } from "@libp2p/websockets";
 import morgan from "morgan";
 
 import debug from "debug";
@@ -20,17 +20,22 @@ import { peerIdFromString } from "@libp2p/peer-id";
 
 const log = debug("heliajs-implementation-node");
 debug.enable(
-	"*,-libp2p:connection-manager:auto-dial:error,-libp2p:identify-push,-libp2p:identify, -libp2p:connection-manager:auto-dial,-libp2p:connection-manager:dial-queue,-libp2p:connection-manager:dial-queue:error, -libp2p:connection-manager"
+	"libp2p:transports, libp2p, express, heliajs-implementation-node"
 );
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan("dev"));
 
 const blockstore = new FsBlockstore("./ipfs/blockstore-hello-app");
 const datastore = new FsDatastore("./ipfs/datastore-hello-app");
+
+let peers=0
+
+morgan.token("peers", () => `${peers}`);
+
+app.use(morgan(":method :url :status :res[content-length] bytes - :response-time ms :peers peers"));
 
 // const libp2p = await createLibp2p({
 // 	transports: [webSockets()],
@@ -72,11 +77,11 @@ const textEncoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 helia.libp2p.addEventListener("peer:connect", (evt) => {
-	log("connected to peer: ", evt.detail);
+	peers++;
 });
 
 helia.libp2p.addEventListener("peer:disconnect", (evt) => {
-	log("disconnected from peer: ", evt.detail);
+	peers--;
 });
 
 const heliafs = unixfs(helia);
@@ -91,15 +96,22 @@ app.get("/peers", async (req, res) => {
 });
 
 app.get("/cat/:cid", async (req, res) => {
+	try {
+		log("cat: " + req.params.cid);
 	const cidString = req.params.cid;
 	let text = "";
 	const cid = CID.parse(cidString);
 	for await (const chunk of heliafs.cat(cid)) {
+		log("chunk: " + chunk);
 		text += decoder.decode(chunk, {
 			stream: true,
 		});
 	}
 	res.json(text);
+	} catch (error) {
+		res.json(error);
+	}
+	
 });
 
 app.get("/add/:text", async (req, res) => {
