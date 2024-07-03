@@ -1,135 +1,118 @@
 import express from "express";
 import { FsBlockstore } from "blockstore-fs";
-import { FsDatastore } from "datastore-fs";
+import { MemoryDatastore } from "datastore-core";
+
 import { createHelia } from "helia";
 import { unixfs } from "@helia/unixfs";
-// import { noise } from "@chainsafe/libp2p-noise";
-// import { yamux } from "@chainsafe/libp2p-yamux";
-// import { bootstrap } from "@libp2p/bootstrap";
-// import { identify, identifyPush } from "@libp2p/identify";
-// import { autoNAT } from "@libp2p/autonat";
-// import { dcutr } from "@libp2p/dcutr";
-// import { kadDHT, removePrivateAddressesMapper } from "@libp2p/kad-dht";
-// import { createLibp2p } from "libp2p";
-// import { webSockets } from "@libp2p/websockets";
 import morgan from "morgan";
 
-import debug from "debug";
-import { CID } from "multiformats";
-import { peerIdFromString } from "@libp2p/peer-id";
+import { commitFile, fetchCommittedFile } from "./heliafileutils.js";
 
+import debug from "debug";
 const log = debug("heliajs-implementation-node");
-debug.enable(
-	"libp2p:transports, libp2p, express, heliajs-implementation-node"
-);
+debug.enable("libp2p:transports, libp2p, express, heliajs-implementation-node, helia-utils");
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-const blockstore = new FsBlockstore("./ipfs/blockstore-hello-app");
-const datastore = new FsDatastore("./ipfs/datastore-hello-app");
-
-let peers=0
-
 morgan.token("peers", () => `${peers}`);
+app.use(
+	morgan(
+		":method :url :status :res[content-length] bytes - :response-time ms :peers peers"
+	)
+);
 
-app.use(morgan(":method :url :status :res[content-length] bytes - :response-time ms :peers peers"));
+let peers = 0;
+let Helia = null;
+let HeliaFs = null;
 
-// const libp2p = await createLibp2p({
-// 	transports: [webSockets()],
-// 	connectionEncryption: [noise()],
-// 	streamMuxers: [yamux()],
-// 	datastore: datastore,
-// 	peerDiscovery: [
-// 		bootstrap({
-// 			list: [
-// 				"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-// 				"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
-// 				"/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
-// 				"/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
-// 			],
-// 		}),
-// 	],
-// 	services: {
-// 		identify: identify(),
-// 		identifyPush: identifyPush(),
-// 		autoNAT: autoNAT(),
-// 		dcutr: dcutr(),
-// 		dht: kadDHT({
-// 			protocol: "/ipfs/kad/1.0.0",
-// 			peerInfoMapper: removePrivateAddressesMapper,
-// 		}),
-// 	},
-// });
+let error = false;
+let starting = true;
 
-// await libp2p.start();
+try {
+	const blockstore = new FsBlockstore("./ipfs/blockstore-hello-app");
+	const datastore = new MemoryDatastore();
 
-const helia = await createHelia({
-	datastore,
-	blockstore,
-});
+	Helia = await createHelia({
+		datastore,
+		blockstore,
+	});
 
-await helia.libp2p.services.dht.setMode("server");
+	if (!Helia) {
+		throw new Error("Helia not created");
+	}
 
-const textEncoder = new TextEncoder();
-const decoder = new TextDecoder();
+	await Helia.libp2p.services.dht.setMode("server");
 
-helia.libp2p.addEventListener("peer:connect", (evt) => {
-	peers++;
-});
+	Helia.libp2p.addEventListener("peer:connect", (evt) => {
+		peers++;
+	});
 
-helia.libp2p.addEventListener("peer:disconnect", (evt) => {
-	peers--;
-});
+	Helia.libp2p.addEventListener("peer:disconnect", (evt) => {
+		peers--;
+	});
 
-const heliafs = unixfs(helia);
+	HeliaFs = unixfs(Helia);
+
+	log("Helia started");
+	starting = false;
+} catch (e) {
+	log(e);
+	error = true;
+}
 
 app.get("/", (req, res) => {
 	res.json("Hello World!");
 });
 
 app.get("/peers", async (req, res) => {
-	const peers = await helia.libp2p.getPeers();
+	const peers = await Helia.libp2p.getPeers();
 	res.json(peers);
 });
 
 app.get("/cat/:cid", async (req, res) => {
-	try {
-		log("cat: " + req.params.cid);
+	log("cat: " + req.params.cid);
 	const cidString = req.params.cid;
-	let text = "";
-	const cid = CID.parse(cidString);
-	for await (const chunk of heliafs.cat(cid)) {
-		log("chunk: " + chunk);
-		text += decoder.decode(chunk, {
-			stream: true,
+	const { filename, fileType } = req.body;
+
+	const file = await fetchCommittedFile(
+		cidString,
+		filename,
+		fileType,
+		HeliaFs,
+		error,
+		starting
+	);
+
+	if (file) {
+		// fs.writeFileSync("./savedFiles/" + filename, await file.text());
+
+		res.json({
+			file,
 		});
+	} else {
+		res.status(404).json({ error: "file not found" });
 	}
-	res.json(text);
-	} catch (error) {
-		res.json(error);
-	}
-	
 });
 
-app.get("/add/:text", async (req, res) => {
-	const text = req.params.text;
-	const data = textEncoder.encode(text);
-	const cid = await heliafs.addBytes(data, helia.blockstore);
-	res.json(cid);
+app.get("/add", async (req, res) => {
+	const { file } = req.body;
+	const cid = await commitFile(file, Helia, HeliaFs, error, starting);
+	res.json({ cid });
 });
 
-app.get("/connect/:peerId", async (req, res) => {
-	try {
-		const peerString = req.params.peerId;
-		const peerId = peerIdFromString(peerString);
-		const peerInfo = await helia.libp2p.peerRouting.findPeer(peerId);
-		res.json(peerInfo);
-	} catch (error) {
-		res.json(error);
-	}
+app.get("/add/text", async (req, res) => {
+	const { text } = req.body;
+
+	const buffer = new TextEncoder().encode(text);
+	const blob = new Blob([buffer], { type: "text/plain" });
+	const file = new File([blob], Math.random() * 123452344 + ".txt", {
+		type: "text/plain",
+	});
+
+	const cid = await commitFile(file, Helia, HeliaFs, error, starting);
+	res.json({ cid });
 });
 
 app.listen(3000, () => {
